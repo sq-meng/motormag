@@ -10,10 +10,9 @@ import numpy as np
 import serial
 import re
 
+import log
+from mode import MOCK, CH3600
 
-CH3600 = True
-PORT_GAUSS = 'COM16'
-MOCK = False
 DEV = False
 
 
@@ -27,12 +26,12 @@ def read_once(flush=True):
     """
     while True:
         if MOCK:
-            print('read once!')
-            return np.array([1, 2, 3])
+            log.mock('Read gaussmeter.')
+            return np.random.random(3)
         if flush:
-            gauss_port.read_all()
-            gauss_port.read_until(b'\n')
-        raw_msg = gauss_port.read_until(b'\n').decode(encoding='ascii')
+            serial_port.read_all()
+            serial_port.read_until(b'\n')
+        raw_msg = serial_port.read_until(b'\n').decode(encoding='ascii')
         if CH3600:
             pattern = '#([-+]?\d*\.{0,1}\d+)/.*?;([-+]?\d*\.{0,1}\d+)/.*?;([-+]?\d*\.{0,1}\d+)/.*?>'
         else:
@@ -58,11 +57,11 @@ def read_n_times(reps):
 def init(port):
     if isinstance(port, int):
         port = "COM%d" % port
-    global gauss_port
-    gauss_port = serial.Serial(port, 115200, timeout=1)
-    gauss_port.write(b'DATA?>')
+    global serial_port
+    serial_port = serial.Serial(port, 115200, timeout=1)
+    serial_port.write(b'DATA?>')
 
 
 def close():
-    global gauss_port
-    gauss_port.close()
+    global serial_port
+    serial_port.close()

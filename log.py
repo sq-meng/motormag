@@ -31,3 +31,7 @@ def fail(message):
 
 def warn(message):
     color_print(message, bcolors.WARNING)
+
+
+def mock(message):
+    color_print('MOCK: ' + message, bcolors.OKCYAN)

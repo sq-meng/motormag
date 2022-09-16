@@ -15,6 +15,24 @@ import System
 import time
 import signal
 import log
+from mode import MOCK
+
+
+def _nth_bit(number, bit):
+    return ((number >> bit) & 1) == 1
+
+
+class InputState(object):
+    def __init__(self, state):
+        self.x_low = _nth_bit(state, 9)
+        self.x_high = _nth_bit(state, 10)
+        self.y_low = _nth_bit(state, 6)
+        self.y_high = _nth_bit(state, 7)
+        self.z_low = _nth_bit(state, 3)
+        self.z_high = _nth_bit(state, 4)
+
+    def any(self):
+        return any((self.x_low, self.x_high, self.y_low, self.y_high, self.z_low, self.z_high))
 
 
 def init(port):
@@ -23,6 +41,9 @@ def init(port):
     :param port:(int, str), int X means COMX, or str 'COM8'
     :return: status code from dll library
     """
+    if MOCK:
+        log.log('motor controller serial port opened')
+        return 1
     if isinstance(port, int):
         port = "COM%d" % port
     result = motor_port.MoCtrCard_Initial(System.String(port))
@@ -67,6 +88,9 @@ def set_position(axis_id, value):
     :param value: value in mm.
     :return: status code
     """
+    if MOCK:
+        log.mock('motor controller position cleared.')
+        return 1
     return motor_port.MoCtrCard_ResetCoordinate(System.Byte(axis_id), System.Single(value))
 
 
@@ -173,6 +197,9 @@ def multi_absolute_move(target, speed=25, acceleration=0.3, coordinated=True, bl
     :param delay:
     :return:
     """
+    if MOCK:
+        log.mock('Absolute movement to %s initiated' % str(target))
+        return 1
     try:
         _, _, _ = target
     except (TypeError, ValueError, IndexError):
@@ -215,7 +242,7 @@ def is_running():
 
 def wait(delay=0.0):
     """
-    Blocks until all axes stop moving.
+    Blocks until all axes stop moving
     :param delay: further wait after stopping.
     :return: None
     """
@@ -225,6 +252,15 @@ def wait(delay=0.0):
         else:
             break
     time.sleep(delay)
+
+
+def get_input_state():
+    if MOCK:
+        log.mock('Input state checked')
+        return InputState(0)
+    arr = System.Array.CreateInstance(System.UInt32, 1)
+    motor_port.MOCtrCard_GetInputState(System.Byte(0), arr)
+    return InputState(arr[0])
 
 
 motor_port = SerialPortLibrary.SPLibClass()
