@@ -1,3 +1,4 @@
+import log
 import motor
 import mag
 import numpy as np
@@ -29,12 +30,28 @@ def get_step_size(points):
         return np.NaN
 
 
+def test_corners(x_points, y_points, z_points, speed=10):
+    x_min, x_max = min(x_points), max(x_points)
+    y_min, y_max = min(y_points), max(y_points)
+    z_min, z_max = min(z_points), max(z_points)
+    log.log('Driving to 8 corners of test volume.')
+    motor.multi_absolute_move([x_min, y_min, z_min])
+    motor.multi_absolute_move([x_max, y_min, z_min])
+    motor.multi_absolute_move(([x_max, y_max, z_min]))
+    motor.multi_absolute_move([x_max, y_min, z_min])
+    motor.multi_absolute_move([x_min, y_min, z_max])
+    motor.multi_absolute_move([x_max, y_min, z_max])
+    motor.multi_absolute_move(([x_max, y_max, z_max]))
+    motor.multi_absolute_move([x_max, y_min, z_max])
+
+
 def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None, step_size=5, order='zxy',
              n_reps=3):
     motor.zero()
     x_points = range_to_points(x_range, x_steps, step_size)
     y_points = range_to_points(y_range, y_steps, step_size)
     z_points = range_to_points(z_range, z_steps, step_size)
+    test_corners(x_points, y_points, z_points)
     # Un-flattening xm, ym and zm by shape (xsize, ysize, zsize) returns them to the matrix form.
     xm, ym, zm = np.meshgrid(x_points, y_points, z_points, indexing='ij')
     data = np.vstack([xm.flatten(), ym.flatten(), zm.flatten(), np.zeros([3, len(xm.flatten())])]).T
