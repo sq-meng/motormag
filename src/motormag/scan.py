@@ -1,11 +1,18 @@
-import log
-import motor
-import mag
+from motormag import log
+from motormag import motor
+from motormag import mag
 import numpy as np
 import pandas as pd
 
 
 def range_to_points(range_def, steps=None, step_size=5):
+    """
+    Converts a scan range definition into list of points.
+    :param range_def: [start, end] or a single number.
+    :param steps: Number of steps, ignored if range_def is a single number.
+    :param step_size: Difference between steps, ignored if total number of steps given.
+    :return: A list of numbers.
+    """
     if step_size == 0:
         raise ValueError('Step size cannot be zero')
     try:
@@ -52,16 +59,16 @@ def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None
     y_points = range_to_points(y_range, y_steps, step_size)
     z_points = range_to_points(z_range, z_steps, step_size)
     test_corners(x_points, y_points, z_points)
-    # Un-flattening xm, ym and zm by shape (xsize, ysize, zsize) returns them to the matrix form.
+    # Un-flattening xm, ym and zm by shape (x_steps, y_steps, z_steps) returns them to the matrix form.
     xm, ym, zm = np.meshgrid(x_points, y_points, z_points, indexing='ij')
-    data = np.vstack([xm.flatten(), ym.flatten(), zm.flatten(), np.zeros([3, len(xm.flatten())])]).T
-    df = pd.DataFrame(data, columns=['x', 'y', 'z', 'mag_x', 'mag_y', 'mag_z'])
-    # Motor movement order sorting: y axis should move the most and z the least.
+    data = np.vstack([xm.flatten(), ym.flatten(), zm.flatten(), np.zeros([6, len(xm.flatten())])]).T
+    df = pd.DataFrame(data, columns=['x', 'y', 'z', 'mag_x', 'mag_y', 'mag_z', 'temp_x', 'temp_y', 'temp_z'])
+    # Motor movement order sorting: y-axis should move the most and z the least.
     df.sort_values([*order], inplace=True)
     for i in df.index:
         x, y, z = df.loc[i, ['x', 'y', 'z']]
         motor.multi_absolute_move([x, y, z])
-        df.loc[i, ['mag_x', 'mag_y', 'mag_z']] = mag.read_n_times(n_reps)
+        df.loc[i, ['mag_x', 'mag_y', 'mag_z', 'temp_x', 'temp_y', 'temp_z']] = mag.read_n_times(n_reps)
     df.sort_index(inplace=True)
     df.attrs['lengths'] = [len(x_points), len(y_points), len(z_points)]
     df.attrs['step_sizes'] = [get_step_size(x_points), get_step_size(y_points), get_step_size(z_points)]

@@ -8,14 +8,14 @@ A wrapper module for WNMC400 stepper controller
 
 
 import clr
-clr.AddReference("./res/MCC4DLL")
+import pkg_resources
+clr.AddReference(pkg_resources.resource_filename(__name__, "../../res/MCC4DLL"))
 # noinspection PyUnresolvedReferences
 from clr import SerialPortLibrary
 import System
 import time
-import signal
-import log
-from mode import MOCK
+import motormag.log as log
+from motormag.mode import MOCK
 
 
 def _nth_bit(number, bit):
@@ -126,7 +126,7 @@ def mdi_command(command):
     return result
 
 
-def relative_move(axis_id, distance, speed=25, acceleration=0.3, block=True, delay=0.0):
+def single_relative_move(axis_id, distance, speed=25, acceleration=0.3, block=True, delay=0.0):
     """
     Single-axis relative move using Gcode (G80)
     :param axis_id: (0, 1, 2) for x, y and z respectively.
@@ -263,7 +263,19 @@ def get_input_state():
     return InputState(arr[0])
 
 
+def up(distance, speed=20):
+    single_relative_move(1, distance, speed=speed)
+
+
+def left(distance, speed=20):
+    single_relative_move(0, distance, speed=speed)
+
+
+def backward(distance, speed=20):
+    single_relative_move(2, distance, speed=speed)
+
+
 motor_port = SerialPortLibrary.SPLibClass()
               
-if __name__ == "__main__":
-    init('COM8')
+# if __name__ == "__main__":
+#     init('COM8')

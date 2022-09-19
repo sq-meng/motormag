@@ -29,7 +29,7 @@ def get_mag_field_amplitude(data, axes='xyz'):
     """
     positions, mags = dataframe_to_matrices(data)
     if len(axes) == 1:
-        return mags[axes]
+        return [positions, mags[axes]]
     else:
         return [positions, np.sqrt(sum([np.power(mags[ax], 2) for ax in axes]))]
 
@@ -39,8 +39,8 @@ def get_mag_field_relative_gradient(data, ):
     pass
 
 
-def slice_and_show_strength(data_frame, axis, position=0):
-    positions, values = get_mag_field_amplitude(data_frame)
+def slice_and_show_strength(data_frame, axis, position=0, field_axis='xyz'):
+    positions, values = get_mag_field_amplitude(data_frame, axes=field_axis)
     slice_and_draw_scalar_matrix(positions, values, axis, position)
 
 
