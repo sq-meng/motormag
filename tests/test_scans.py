@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import scan
+from motormag import scan
 
 
 def test_range_to_points():

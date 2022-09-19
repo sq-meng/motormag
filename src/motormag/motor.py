@@ -9,13 +9,13 @@ A wrapper module for WNMC400 stepper controller
 
 import clr
 import pkg_resources
-clr.AddReference(pkg_resources.resource_filename(__name__, "../../res/MCC4DLL"))
+clr.AddReference(pkg_resources.resource_filename(__name__, "res/MCC4DLL"))
 # noinspection PyUnresolvedReferences
 from clr import SerialPortLibrary
 import System
 import time
 import motormag.log as log
-from motormag.mode import MOCK
+from motormag._mode import MOCK
 
 
 def _nth_bit(number, bit):

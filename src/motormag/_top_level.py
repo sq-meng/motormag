@@ -1,5 +1,6 @@
 import motormag.motor as motor
 import motormag.mag as mag
+import motormag.draw as draw
 
 
 def init(motor_port=8, mag_port=16):

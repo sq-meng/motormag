@@ -11,7 +11,7 @@ import serial
 import re
 
 from motormag import log
-from motormag.mode import MOCK, CH3600
+from motormag._mode import MOCK, CH3600
 
 DEV = False
 
