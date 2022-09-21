@@ -53,7 +53,7 @@ def test_corners(x_points, y_points, z_points, speed=10):
 
 
 def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None, step_size=5, order='zxy',
-             n_reps=3):
+             n_discards=1, n_reps=3):
     motor.zero()
     x_points = range_to_points(x_range, x_steps, step_size)
     y_points = range_to_points(y_range, y_steps, step_size)
@@ -65,10 +65,17 @@ def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None
     df = pd.DataFrame(data, columns=['x', 'y', 'z', 'mag_x', 'mag_y', 'mag_z', 'temp_x', 'temp_y', 'temp_z'])
     # Motor movement order sorting: y-axis should move the most and z the least.
     df.sort_values([*order], inplace=True)
-    for i in df.index:
+    log.log('Starting box scan.')
+    total_points = len(df.index)
+    for nth, i in enumerate(df.index):
         x, y, z = df.loc[i, ['x', 'y', 'z']]
         motor.multi_absolute_move([x, y, z])
+        for _ in range(n_discards):
+            mag.read_once()
         df.loc[i, ['mag_x', 'mag_y', 'mag_z', 'temp_x', 'temp_y', 'temp_z']] = mag.read_n_times(n_reps)
+        log.log('%d/%d, field at %.2f, %.2f, %.2f: %.2fmT, %.2fmT, %.2fmT' % (nth + 1, total_points, x, y, z,
+                                                                              *df.loc[i, ['mag_x', 'mag_y', 'mag_z']]))
+    motor.multi_absolute_move([0, 0, 0])
     df.sort_index(inplace=True)
     df.attrs['lengths'] = [len(x_points), len(y_points), len(z_points)]
     df.attrs['step_sizes'] = [get_step_size(x_points), get_step_size(y_points), get_step_size(z_points)]

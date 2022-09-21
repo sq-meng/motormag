@@ -35,16 +35,16 @@ def get_mag_field_amplitude(data, axes='xyz'):
 
 
 def get_mag_field_relative_gradient(data, ):
-    #TODO: finish this
     pass
 
 
-def slice_and_show_strength(data_frame, axis, position=0, field_axis='xyz'):
+def slice_and_show_strength(data_frame, axis, position=0, field_axis='xyz', vmin=None, vmax=None):
     positions, values = get_mag_field_amplitude(data_frame, axes=field_axis)
-    slice_and_draw_scalar_matrix(positions, values, axis, position)
+    f, ax = slice_and_draw_scalar_matrix(positions, values, axis, position, vmin, vmax)
+    return f, ax
 
 
-def slice_and_draw_scalar_matrix(positions, values, axis, position=0):
+def slice_and_draw_scalar_matrix(positions, values, axis, position=0, vmin=None, vmax=None):
     draw_plane = [ax for ax in 'xyz' if ax != axis]
     slicer = tuple([slice(None) if ax != axis else position for ax in 'xyz'])
     horizontal_matrix = positions[draw_plane[0]][slicer]
@@ -52,4 +52,6 @@ def slice_and_draw_scalar_matrix(positions, values, axis, position=0):
     values_matrix = values[slicer]
     f, ax = plt.subplots(1)
     ax.axis('equal')
-    ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto')
+    pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', vmin=vmin, vmax=vmax, cmap='jet')
+    f.colorbar(pcm, ax=ax)
+    return f, ax
