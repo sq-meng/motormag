@@ -14,8 +14,8 @@ clr.AddReference(pkg_resources.resource_filename(__name__, "res/MCC4DLL"))
 from clr import SerialPortLibrary
 import System
 import time
-import motormag.log as log
-from motormag._mode import MOCK
+from . import log
+from . import _mode
 
 
 def _nth_bit(number, bit):
@@ -41,7 +41,7 @@ def init(port):
     :param port:(int, str), int X means COMX, or str 'COM8'
     :return: status code from dll library
     """
-    if MOCK:
+    if _mode.MOCK:
         log.log('motor controller serial port opened')
         return 1
     if isinstance(port, int):
@@ -88,7 +88,7 @@ def set_position(axis_id, value):
     :param value: value in mm.
     :return: status code
     """
-    if MOCK:
+    if _mode.MOCK:
         log.mock('motor controller position cleared.')
         return 1
     return motor_port.MoCtrCard_ResetCoordinate(System.Byte(axis_id), System.Single(value))
@@ -207,7 +207,7 @@ def multi_absolute_move(target, speed=25, acceleration=0.3, coordinated=True, bl
     :param delay:
     :return:
     """
-    if MOCK:
+    if _mode.MOCK:
         log.mock('Absolute movement to %s initiated' % str(target))
         return 1
     try:
@@ -270,7 +270,7 @@ def wait(delay=0.0):
 
 
 def get_input_state():
-    if MOCK:
+    if _mode.MOCK:
         log.mock('Input state checked')
         return InputState(0)
     arr = System.Array.CreateInstance(System.UInt32, 1)

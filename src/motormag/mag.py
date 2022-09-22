@@ -10,8 +10,8 @@ import numpy as np
 import serial
 import re
 
-from motormag import log
-from motormag._mode import MOCK, CH3600
+from . import log
+from . import _mode
 
 DEV = False
 
@@ -34,7 +34,7 @@ def read_once(flush=True):
     :return: Length-6 ndarray, fields in x, y, z directions, followed by temp reading of x, y, z probes.
     """
     while True:
-        if MOCK:
+        if _mode.MOCK:
             log.mock('Read gaussmeter.')
             raw_msg = r'#00000.0097/000/+0256;-00000.0003/000/+0256;-00000.0027/000/+256>'
         else:
@@ -42,7 +42,7 @@ def read_once(flush=True):
                 serial_port.read_all()
                 serial_port.read_until(b'\n')
             raw_msg = serial_port.read_until(b'\n').decode(encoding='ascii')
-        if CH3600:
+        if _mode.CH3600:
             try:
                 mags_and_temps = parse_ch3600_serial(raw_msg)
                 break
@@ -58,7 +58,7 @@ def read_once(flush=True):
 
     mags_and_temps_array = np.array([float(x) for x in mags_and_temps])
     mags_and_temps_array[3:] = mags_and_temps_array[3:] / 10
-    if MOCK:
+    if _mode.MOCK:
         mags_and_temps_array = mags_and_temps_array + np.random.random(6)* 5 - 2.5
     return mags_and_temps_array
 

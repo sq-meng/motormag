@@ -1,6 +1,6 @@
-from motormag import log
-from motormag import motor
-from motormag import mag
+from . import log
+from . import motor
+from . import mag
 import numpy as np
 import pandas as pd
 

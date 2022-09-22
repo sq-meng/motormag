@@ -1,5 +1,4 @@
-import scan
-import draw
+import motormag
 
-df = scan.box_scan([10, 20], [20, 40], [40, 70])
-draw.strength_2d(df, 'y')
+df = motormag.scan.box_scan([10, 20], [20, 40], [40, 70])
+motormag.draw.strength_2d(df, 'y')
