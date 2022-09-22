@@ -104,14 +104,24 @@ def zero():
     set_position(2, 0.0)
 
 
+def pause():
+    return motor_port.MoCtrCard_PauseAxisMov(System.Byte(255))
+
+
+def quit_gcode():
+    return motor_port.MoCtrCard_QuiteMotionControl()
+
+
 def stop():
     """
     Gracefully stops all axis movements.
+    !!!INVALIDATES POSITION IF SENT MID-GCODE MOVEMENT!!!
     :return: None
     """
     motor_port.MoCtrCard_StopAxisMov(System.Byte(0))
     motor_port.MoCtrCard_StopAxisMov(System.Byte(1))
     motor_port.MoCtrCard_StopAxisMov(System.Byte(2))
+    log.warn("Motor controller coordinate invalidated!")
 
 
 def mdi_command(command):
@@ -246,12 +256,17 @@ def wait(delay=0.0):
     :param delay: further wait after stopping.
     :return: None
     """
-    while True:
-        if is_running():
-            time.sleep(0.2)
-        else:
-            break
-    time.sleep(delay)
+    try:
+        while True:
+            if is_running():
+                time.sleep(0.2)
+            else:
+                break
+        time.sleep(delay)
+    except KeyboardInterrupt as ki:
+        pause()
+        quit_gcode()
+        raise ki
 
 
 def get_input_state():
@@ -259,7 +274,7 @@ def get_input_state():
         log.mock('Input state checked')
         return InputState(0)
     arr = System.Array.CreateInstance(System.UInt32, 1)
-    motor_port.MOCtrCard_GetInputState(System.Byte(0), arr)
+    motor_port.MoCtrCard_GetInputState(System.Byte(0), arr)
     return InputState(arr[0])
 
 

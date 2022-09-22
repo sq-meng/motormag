@@ -5,6 +5,29 @@ import numpy as np
 import pandas as pd
 
 
+class BoxScan(object):
+    def __init__(self, x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None, step_size=5, order='zxy',
+             time_wait=0.5, n_discards=0, n_reps=3):
+        self.x_range = x_range
+        self.y_range = y_range
+        self.z_range = z_range
+        self.x_steps = x_steps
+        self.y_steps = y_steps
+        self.z_steps = z_steps
+        self.step_size = step_size
+        self.order = order
+        self.time_wait = time_wait
+        self.n_discards=n_discards
+        self.n_reps = n_reps
+
+        self.data = None
+
+    def run(self):
+        pass
+
+
+
+
 def range_to_points(range_def, steps=None, step_size=5):
     """
     Converts a scan range definition into list of points.
@@ -54,7 +77,8 @@ def test_corners(x_points, y_points, z_points, speed=10):
 
 def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None, step_size=5, order='zxy',
              n_discards=1, n_reps=3):
-    motor.zero()
+    if not all(np.abs(np.array(motor.get_position())) < 0.1):
+        raise RuntimeError('Motor stage not at zero - manually drive to zero before scanning.')
     x_points = range_to_points(x_range, x_steps, step_size)
     y_points = range_to_points(y_range, y_steps, step_size)
     z_points = range_to_points(z_range, z_steps, step_size)
