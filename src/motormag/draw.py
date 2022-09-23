@@ -38,27 +38,12 @@ def get_mag_field_relative_gradient(data, ):
     pass
 
 
-def resolve_2d_cut_index(positions, cut_axis, cut_position):
-    positions_slicer = tuple([slice(0, 1, 1) if ax != cut_axis else slice(None) for ax in 'xyz'])
-    values = positions[cut_axis][positions_slicer]
-    truth = np.isclose(values.flatten(), cut_position)
-    for i, t in enumerate(truth):
-        if t:
-            return i
-    raise ValueError("Requested cut plane position not in scanned data")
-
-
-def slice_2d_scalar(positions, values, cut_axis, cut_index=None, cut_position=None):
-    if cut_index is None and cut_position is None:
-        cut_index = 0
-    elif cut_index is None and cut_position is not None:
-        cut_index = resolve_2d_cut_index(positions, cut_axis, cut_position)
-    else:
-        pass
+def slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position=None):
+    cut_index, cut_position = resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
     draw_plane = [ax for ax in 'xyz' if ax != cut_axis]
     slicer = tuple([slice(None) if ax != cut_axis else cut_index for ax in 'xyz'])
-    horizontal_matrix = positions[draw_plane[0]][slicer]
-    vertical_matrix = positions[draw_plane[1]][slicer]
+    horizontal_matrix = coordinates[draw_plane[0]][slicer]
+    vertical_matrix = coordinates[draw_plane[1]][slicer]
     values_matrix = values[slicer]
     return horizontal_matrix, vertical_matrix, values_matrix
 
@@ -67,19 +52,41 @@ def slice_1d_scalar(positions, values, axis, ):
     pass
 
 
-def strength_2d(data_frame, axis=None, cut_index=None, cut_position=None, field_axis='xyz', vmin=None, vmax=None):
-    if axis is None:
-        fixed_axes = get_fixed_axes(data_frame)
-        if len(fixed_axes) == 1:
-            axis = fixed_axes[0]
-        elif len(fixed_axes) == 0:
-            raise ValueError('Failed to resolve cut axis automatically: all 3 axes changed.')
-        elif len(fixed_axes) == 2:
-            raise ValueError('2-D data required to plot 2-D plot, got 1-D data.')
+def resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position):
+    positions_slicer = tuple([slice(0, 1, 1) if ax != cut_axis else slice(None) for ax in 'xyz'])
+    values = coordinates[cut_axis][positions_slicer].flatten()
+    if cut_index is not None:
+        return cut_index, values[cut_index]
+    elif cut_index is None and cut_position is None:
+        return 0, values[0]
+    else:
+        truth = np.isclose(values, cut_position)
+        for i, t in enumerate(truth):
+            if t:
+                return i, values[i]
+        raise ValueError("Requested cut plane position not in scanned data")
 
+
+def resolve_2d_cut_axis(data_frame):
+    fixed_axes = get_fixed_axes(data_frame)
+    if len(fixed_axes) == 1:
+        return fixed_axes[0]
+    elif len(fixed_axes) == 0:
+        raise ValueError('Failed to resolve cut axis automatically: all 3 axes changed.')
+    elif len(fixed_axes) == 2:
+        raise ValueError('2-D data required to plot 2-D plot, got 1-D data.')
+    else:
+        raise ValueError('Somehow got 3 or more fixed axes...')
+
+
+def strength_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axis='xyz', vmin=None, vmax=None, ax=None):
+    if cut_axis is None:
+        cut_axis = resolve_2d_cut_axis(data_frame)
     coordinates, values = get_mag_field_amplitude(data_frame, axes=field_axis)
-    horizontal_matrix, vertical_matrix, values_matrix = slice_2d_scalar(coordinates, values, axis, cut_index, cut_position)
-    f, ax = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax)
+    horizontal_matrix, vertical_matrix, values_matrix = slice_2d_scalar(coordinates, values, cut_axis, cut_index, cut_position)
+    cut_index, cut_position = resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
+    f, ax = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, ax)
+    ax.set_xlabel('Field: %s, cut position: %s=%.1f(i=%d)' % (field_axis, cut_axis, cut_position, cut_index))
     return f, ax
 
 
@@ -91,8 +98,11 @@ def get_fixed_axes(data_frame):
     return [ax for (ax, t) in zip('xyz', fixed) if t]
 
 
-def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=None, vmax=None):
-    f, ax = plt.subplots(1)
+def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=None, vmax=None, ax=None):
+    if ax is None:
+        f, ax = plt.subplots(1)
+    else:
+        f = ax.figure
     ax.axis('equal')
     pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', vmin=vmin, vmax=vmax)
     f.colorbar(pcm, ax=ax)
