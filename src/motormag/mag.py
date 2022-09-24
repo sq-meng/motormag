@@ -76,6 +76,7 @@ def init(port):
     global serial_port
     serial_port = serial.Serial(port, 115200, timeout=5)
     serial_port.write(b'DATA?>')
+    log.log("Gaussmeter port opened at %s" % port)
 
 
 def close():

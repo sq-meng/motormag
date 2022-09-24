@@ -19,7 +19,7 @@ def dataframe_to_matrices(data: pd.DataFrame, lengths=None):
     return {'x': x, 'y': y, 'z': z}, {'x': mag_x, 'y': mag_y, 'z': mag_z}
 
 
-def get_mag_field_amplitude(data, axes='xyz'):
+def calculate_mag_field_amplitude(data, axes='xyz'):
     """
     Returns [coordinates, 3-d scalar matrix] for magnetic field strength.
     :param data: input DataFrame
@@ -34,12 +34,12 @@ def get_mag_field_amplitude(data, axes='xyz'):
         return [coordinates, np.sqrt(sum([np.power(mags[ax], 2) for ax in axes]))]
 
 
-def get_mag_field_relative_gradient(data, ):
+def mag_field_relative_gradient(data, ):
     pass
 
 
 def slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position=None):
-    cut_index, cut_position = resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
+    cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
     draw_plane = [ax for ax in 'xyz' if ax != cut_axis]
     slicer = tuple([slice(None) if ax != cut_axis else cut_index for ax in 'xyz'])
     horizontal_matrix = coordinates[draw_plane[0]][slicer]
@@ -52,7 +52,7 @@ def slice_1d_scalar(positions, values, axis, ):
     pass
 
 
-def resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position):
+def determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position):
     positions_slicer = tuple([slice(0, 1, 1) if ax != cut_axis else slice(None) for ax in 'xyz'])
     values = coordinates[cut_axis][positions_slicer].flatten()
     if cut_index is not None:
@@ -67,8 +67,8 @@ def resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position):
         raise ValueError("Requested cut plane position not in scanned data")
 
 
-def resolve_2d_cut_axis(data_frame):
-    fixed_axes = get_fixed_axes(data_frame)
+def determine_2d_cut_axis(data_frame):
+    fixed_axes = determine_fixed_axes(data_frame)
     if len(fixed_axes) == 1:
         return fixed_axes[0]
     elif len(fixed_axes) == 0:
@@ -79,19 +79,20 @@ def resolve_2d_cut_axis(data_frame):
         raise ValueError('Somehow got 3 or more fixed axes...')
 
 
-def strength_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axis='xyz', vmin=None, vmax=None, ax=None):
+def plot_strength_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axis='xyz',
+                     vmin=None, vmax=None, ax=None):
     if cut_axis is None:
-        cut_axis = resolve_2d_cut_axis(data_frame)
-    coordinates, values = get_mag_field_amplitude(data_frame, axes=field_axis)
+        cut_axis = determine_2d_cut_axis(data_frame)
+    coordinates, values = calculate_mag_field_amplitude(data_frame, axes=field_axis)
     horizontal_matrix, vertical_matrix, values_matrix = slice_2d_scalar(coordinates, values, cut_axis, cut_index, cut_position)
-    cut_index, cut_position = resolve_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
-    f, ax = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, ax)
+    cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
+    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, ax)
     ax.set_xlabel('Field: %s, cut position: %s=%.1f(i=%d)' % (field_axis, cut_axis, cut_position, cut_index))
-    return f, ax
+    return f, ax, pcm
 
 
 # noinspection PyTypeChecker
-def get_fixed_axes(data_frame):
+def determine_fixed_axes(data_frame):
     fixed = [all(data_frame.loc[:, 'x'] == data_frame.loc[0, 'x']),
             all(data_frame.loc[:, 'y'] == data_frame.loc[0, 'y']),
             all(data_frame.loc[:, 'z'] == data_frame.loc[0, 'z'])]
@@ -106,4 +107,4 @@ def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=N
     ax.axis('equal')
     pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', vmin=vmin, vmax=vmax)
     f.colorbar(pcm, ax=ax)
-    return f, ax
+    return f, ax, pcm
