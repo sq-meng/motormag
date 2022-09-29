@@ -26,8 +26,6 @@ class BoxScan(object):
         pass
 
 
-
-
 def range_to_points(range_def, steps=None, step_size=5):
     """
     Converts a scan range definition into list of points.
@@ -53,6 +51,16 @@ def range_to_points(range_def, steps=None, step_size=5):
         return np.linspace(start, end, int(abs(end - start) / step_size) + 1)
 
 
+def _order_sanity(order):
+    try:
+        if 'x' in order and 'y' in order and 'z' in order and len(order) == 3:
+            return True
+        else:
+            return False
+    except (ValueError, TypeError):
+        return False
+
+
 def get_step_size(points):
     try:
         return points[1] - points[0]
@@ -60,29 +68,54 @@ def get_step_size(points):
         return np.NaN
 
 
-def test_corners(x_points, y_points, z_points, speed=10):
+def _test_corners(x_points, y_points, z_points, speed=10):
+    """
+    Drives the motor stage to all 8 corners of the scan before actually scanning to avoid crashing with no one around.
+    :param x_points: a list of all x axis points to be scanned.
+    :param y_points: see x
+    :param z_points: see x
+    :param speed: speed to do the test
+    :return: None. Ctrl + C to abort.
+    """
     x_min, x_max = min(x_points), max(x_points)
     y_min, y_max = min(y_points), max(y_points)
     z_min, z_max = min(z_points), max(z_points)
     log.log('Driving to 8 corners of test volume.')
-    motor.multi_absolute_move([x_min, y_min, z_min])
-    motor.multi_absolute_move([x_max, y_min, z_min])
-    motor.multi_absolute_move(([x_max, y_max, z_min]))
-    motor.multi_absolute_move([x_max, y_min, z_min])
-    motor.multi_absolute_move([x_min, y_min, z_max])
-    motor.multi_absolute_move([x_max, y_min, z_max])
-    motor.multi_absolute_move(([x_max, y_max, z_max]))
-    motor.multi_absolute_move([x_max, y_min, z_max])
+    motor.multi_absolute_move([x_min, y_min, z_min], speed=speed)
+    motor.multi_absolute_move([x_max, y_min, z_min], speed=speed)
+    motor.multi_absolute_move([x_max, y_max, z_min], speed=speed)
+    motor.multi_absolute_move([x_max, y_min, z_min], speed=speed)
+    motor.multi_absolute_move([x_min, y_min, z_max], speed=speed)
+    motor.multi_absolute_move([x_max, y_min, z_max], speed=speed)
+    motor.multi_absolute_move([x_max, y_max, z_max], speed=speed)
+    motor.multi_absolute_move([x_max, y_min, z_max], speed=speed)
 
 
 def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None, step_size=5, order='zxy',
              n_discards=1, n_reps=3):
+    """
+    Does a scan in a cubic volume.
+    :param x_range: [start, end] or single value. Give a single value if the axis is not to be scanned.
+    :param y_range: see x
+    :param z_range: see x
+    :param x_steps: number of x direction steps
+    :param y_steps: see x
+    :param z_steps: see x
+    :param step_size: [x_step, y_step, z_step] or single value. Single value will be used for all 3 axes.
+    :param order: length-3 string consisting of letters x, y and z. 1st axis is moved the least - defaults to z as it's
+    the heaviest.
+    :param n_discards: Drop first n mag field readings to give the probe time to settle.
+    :param n_reps: Number of readings to take and average over.
+    :return: pd.DataFrame containing data.
+    """
     if not all(np.abs(np.array(motor.get_position())) < 0.1):
         raise RuntimeError('Motor stage not at zero - manually drive to zero before scanning.')
+    if not _order_sanity(order):
+        raise ValueError('Got invalid scan order: %s' % str(order))
     x_points = range_to_points(x_range, x_steps, step_size)
     y_points = range_to_points(y_range, y_steps, step_size)
     z_points = range_to_points(z_range, z_steps, step_size)
-    test_corners(x_points, y_points, z_points)
+    _test_corners(x_points, y_points, z_points)
     # Un-flattening xm, ym and zm by shape (x_steps, y_steps, z_steps) returns them to the matrix form.
     xm, ym, zm = np.meshgrid(x_points, y_points, z_points, indexing='ij')
     data = np.vstack([xm.flatten(), ym.flatten(), zm.flatten(), np.zeros([6, len(xm.flatten())])]).T
