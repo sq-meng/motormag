@@ -61,7 +61,7 @@ def _order_sanity(order):
         return False
 
 
-def get_step_size(points):
+def _get_step_size(points):
     try:
         return points[1] - points[0]
     except IndexError:
@@ -135,5 +135,5 @@ def box_scan(x_range, y_range, z_range, x_steps=None, y_steps=None, z_steps=None
     motor.multi_absolute_move([0, 0, 0])
     df.sort_index(inplace=True)
     df.attrs['lengths'] = [len(x_points), len(y_points), len(z_points)]
-    df.attrs['step_sizes'] = [get_step_size(x_points), get_step_size(y_points), get_step_size(z_points)]
+    df.attrs['step_sizes'] = [_get_step_size(x_points), _get_step_size(y_points), _get_step_size(z_points)]
     return df
