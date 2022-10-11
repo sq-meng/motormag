@@ -170,3 +170,27 @@ def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=N
     pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', vmin=vmin, vmax=vmax)
     f.colorbar(pcm, ax=ax)
     return f, ax, pcm
+
+
+def sub(field: pd.DataFrame, background: pd.DataFrame):
+    """
+    Subtract background from field. Interpolates if coordinates do not match perfectly.
+    :param field: Measured magnetic field.
+    :param background: Background field with current source turned off.
+    :return: Field with background removed.
+    """
+    if all(field.x == background.x) and all(field.y == background.y) and all(field.z == background.z):
+        field = field.copy()
+        field.loc[:, ['mag_x', 'mag_y', 'mag_z']] = field.loc[:, ['mag_x', 'mag_y', 'mag_z']] - \
+                                                    background.loc[:, ['mag_x', 'mag_y', 'mag_z']]
+        return field
+    else:
+        field = field.copy()
+        bg_interp = field.copy()
+        bg_interp.loc[:, ['mag_x', 'mag_y', 'mag_z']] = griddata(background.loc[:, ['x', 'y', 'z']],
+                                                                 background.loc[:, ['mag_x', 'mag_y', 'mag_z']],
+                                                                 bg_interp.loc[:, ['x', 'y', 'z']])
+        field.loc[:, ['mag_x', 'mag_y', 'mag_z']] = field.loc[:, ['mag_x', 'mag_y', 'mag_z']] - \
+                                                   bg_interp.loc[:, ['mag_x', 'mag_y', 'mag_z']]
+        return field
+

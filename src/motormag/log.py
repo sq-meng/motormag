@@ -1,4 +1,5 @@
 from datetime import datetime
+from . import _mode
 
 
 class bcolors:
@@ -34,4 +35,5 @@ def warn(message):
 
 
 def mock(message):
-    color_print('MOCK: ' + message, bcolors.OKCYAN)
+    if _mode.log_mock:
+        color_print('MOCK: ' + message, bcolors.OKCYAN)
