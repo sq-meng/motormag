@@ -179,18 +179,43 @@ def sub(field: pd.DataFrame, background: pd.DataFrame):
     :param background: Background field with current source turned off.
     :return: Field with background removed.
     """
-    if all(field.x == background.x) and all(field.y == background.y) and all(field.z == background.z):
-        field = field.copy()
-        field.loc[:, ['mag_x', 'mag_y', 'mag_z']] = field.loc[:, ['mag_x', 'mag_y', 'mag_z']] - \
-                                                    background.loc[:, ['mag_x', 'mag_y', 'mag_z']]
-        return field
-    else:
-        field = field.copy()
-        bg_interp = field.copy()
-        bg_interp.loc[:, ['mag_x', 'mag_y', 'mag_z']] = griddata(background.loc[:, ['x', 'y', 'z']],
-                                                                 background.loc[:, ['mag_x', 'mag_y', 'mag_z']],
-                                                                 bg_interp.loc[:, ['x', 'y', 'z']])
-        field.loc[:, ['mag_x', 'mag_y', 'mag_z']] = field.loc[:, ['mag_x', 'mag_y', 'mag_z']] - \
-                                                   bg_interp.loc[:, ['mag_x', 'mag_y', 'mag_z']]
-        return field
+    # try:
+    #     # noinspection PyTypeChecker
+    #     if all(field.x == background.x) and all(field.y == background.y) and all(field.z == background.z):
+    #         bg_matched = background
+    #     else:
+    #         bg_matched = interpolate(field, background)
+    # except ValueError:
+    field = field.copy()
+    bg_matched = interpolate(field, background)
+    field.loc[:, ['mag_x', 'mag_y', 'mag_z']] = field.loc[:, ['mag_x', 'mag_y', 'mag_z']] - \
+                                                bg_matched.loc[:, ['mag_x', 'mag_y', 'mag_z']]
+    return field
 
+
+def interpolate(df_coords, df_values):
+    """
+    Interpolates values in df_values onto coordinates in df_coords.
+    :param df_coords: Onto which positions to evaluate.
+    :param df_values: Field values.
+    :return: A new dataframe with positions in df_coords and data from df_values.
+    """
+    df_coords = df_coords.copy()
+    df_coords.loc[:, ['mag_x', 'mag_y', 'mag_z']] = griddata(df_values.loc[:, ['x', 'y', 'z']],
+                                                             df_values.loc[:, ['mag_x', 'mag_y', 'mag_z']],
+                                                             df_coords.loc[:, ['x', 'y', 'z']])
+    return df_coords
+
+
+def div(dividend, divisor):
+    """
+    See sub.
+    :param dividend:
+    :param divisor:
+    :return:
+    """
+    dividend = dividend.copy()
+    divisor_matched = interpolate(dividend, divisor)
+    dividend.loc[:, ['mag_x', 'mag_y', 'mag_z']] = dividend.loc[:, ['mag_x', 'mag_y', 'mag_z']] / \
+                                                divisor_matched.loc[:, ['mag_x', 'mag_y', 'mag_z']]
+    return dividend
