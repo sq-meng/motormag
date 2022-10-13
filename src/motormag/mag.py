@@ -27,6 +27,11 @@ def parse_ch3600_serial(string):
     return [mag_x, mag_y, mag_z, temp_x, temp_y, temp_z]
 
 
+def parse_ch330_serial(string):
+    pattern = r'#([-+]?\d*\.{0,1}\d+)/([-+]?\d*\.{0,1}\d+)/([-+]?\d*\.{0,1}\d+)\>'
+    mag_x, mag_y, mag_z = re.findall(pattern, string)[0]
+    return [mag_x, mag_y, mag_z, 0.0, 0.0, 0.0]
+
 def read_once(flush=True):
     """
     Reads latest reading from CH330 or CH3600 gaussmeter.
@@ -48,6 +53,13 @@ def read_once(flush=True):
                 break
             except (IndexError, ValueError):
                 log.warn('Invalid message received: %s' % raw_msg)
+        else:
+            try:
+                mags_and_temps = parse_ch330_serial(raw_msg)
+                break
+            except (IndexError, ValueError):
+                log.warn('Invalid message received: %s' % raw_msg)
+
     #         pattern = '#([-+]?\d*\.{0,1}\d+)/.*?;([-+]?\d*\.{0,1}\d+)/.*?;([-+]?\d*\.{0,1}\d+)/.*?>'
     #     msg = re.findall(pattern, raw_msg)
     #     if len(msg) != 0:
@@ -58,8 +70,10 @@ def read_once(flush=True):
 
     mags_and_temps_array = np.array([float(x) for x in mags_and_temps])
     mags_and_temps_array[3:] = mags_and_temps_array[3:] / 10
+    if not _mode.CH3600:
+        mags_and_temps_array[0:3] = mags_and_temps_array[0:3] / 1e6
     if _mode.MOCK:
-        mags_and_temps_array = mags_and_temps_array + np.random.random(6)* 5 - 2.5
+        mags_and_temps_array = mags_and_temps_array + np.random.random(6) * 5 - 2.5
     return mags_and_temps_array
 
 

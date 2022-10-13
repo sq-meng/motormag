@@ -2,9 +2,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from scipy.interpolate import griddata
+from matplotlib.colors import LogNorm, Normalize
+from ._mode import cmap
 
 
 def dataframe_to_matrices(data: pd.DataFrame, lengths=None):
+    """
+    Converts as-scanned dataframe into matrices containing x, y, z coords and mag_x, mag_y, mag_z field values.
+    Pretty much only makes sense for box scans. Ouch.
+    :param data: dataframe input
+    :param lengths: number of steps in [x, y, z] directions. Tries to pull from df.attrs if not given.
+    :return: two dicts with 3 matrices each.
+    """
     if lengths is None:
         try:
             lengths = data.attrs['lengths']
@@ -84,7 +93,16 @@ def relative_field_gradient_squared(data, field_axes='xy', directions='xyz', b_z
     return relative_gradient_squared
 
 
-def slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position=None):
+def _slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position=None):
+    """
+    Cuts 3-d or 2-d matrix by taking values directly, without doing any interpolation.
+    :param coordinates: pack-of-3 matrices containing coordinates
+    :param values: matrix containing values
+    :param cut_axis: cutplane normal
+    :param cut_index: nth plane to show
+    :param cut_position: numerical position of index is not given.
+    :return:
+    """
     cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
     draw_plane = [ax for ax in 'xyz' if ax != cut_axis]
     slicer = tuple([slice(None) if ax != cut_axis else cut_index for ax in 'xyz'])
@@ -94,7 +112,7 @@ def slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position=
     return horizontal_matrix, vertical_matrix, values_matrix
 
 
-def slice_1d_scalar(positions, values, axis, ):
+def slice_1d_scalar(positions, values, axis, indices=None, position=None):
     pass
 
 
@@ -126,29 +144,39 @@ def determine_2d_cut_axis(data_frame):
 
 
 def plot_strength_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axis='xyz',
-                     vmin=None, vmax=None, ax=None):
+                     vmin=None, vmax=None, norm=None, ax=None):
     if cut_axis is None:
         cut_axis = determine_2d_cut_axis(data_frame)
+    cut_plane = [axis for axis in 'xyz' if axis != cut_axis]
     coordinates, values = calculate_mag_field_amplitude(data_frame, axes=field_axis)
-    horizontal_matrix, vertical_matrix, values_matrix = slice_2d_scalar(coordinates, values, cut_axis, cut_index, cut_position)
+    horizontal_matrix, vertical_matrix, values_matrix = _slice_2d_scalar(coordinates, values, cut_axis, cut_index, cut_position)
     cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
-    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, ax)
-    ax.set_title('Field: %s, cut position: %s=%.1f(i=%d)' % (field_axis, cut_axis, cut_position, cut_index))
-
+    if norm is None:
+        norm = Normalize(vmin=vmin, vmax=vmax)
+    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, norm, ax)
+    ax.set_title('Field: %s, cut position: %s=%.1f(i=%d) in mT' % (field_axis, cut_axis, cut_position, cut_index))
+    ax.set_xlabel('%s/mm' % cut_plane[0])
+    ax.set_ylabel('%s/mm' % cut_plane[1])
     return f, ax, pcm
 
 
 def plot_relative_gradient_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axes='xy',
-                              spatial_axes='xyz', b_zero=None, center_position=None, vmin=None, vmax=None, ax=None):
+                              spatial_axes='xyz', b_zero=None, center_position=None, vmin=1e-5, vmax=1e-1, norm=None,
+                              ax=None):
     if cut_axis is None:
         cut_axis = determine_2d_cut_axis(data_frame)
     coordinates, _ = dataframe_to_matrices(data_frame)
     values = np.sqrt(relative_field_gradient_squared(data_frame, field_axes, directions=spatial_axes,
                                                      b_zero=b_zero, center_position=center_position))
-    horizontal_matrix, vertical_matrix, values_matrix = slice_2d_scalar(coordinates, values, cut_axis, cut_index,
-                                                                        cut_position)
+    horizontal_matrix, vertical_matrix, values_matrix = _slice_2d_scalar(coordinates, values, cut_axis, cut_index,
+                                                                         cut_position)
     cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
-    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, ax)
+    if norm is None:
+        norm = LogNorm(vmin=vmin, vmax=vmax)
+    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, norm, ax)
+    contour_plot = ax.contour(horizontal_matrix, vertical_matrix, values_matrix, [2e-5, 5e-5, 1e-4, 2e-4, 0.0005],
+                              colors='w', zorder=10)
+    ax.clabel(contour_plot, fontsize=10, inline=1, fmt='%.0e')
     ax.set_title('B components: %s, cut position: %s=%.1f(i=%d)' % (field_axes, cut_axis, cut_position, cut_index))
     return f, ax, pcm
 
@@ -161,13 +189,13 @@ def determine_fixed_axes(data_frame):
     return [ax for (ax, t) in zip('xyz', fixed) if t]
 
 
-def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=None, vmax=None, ax=None):
+def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=None, vmax=None, norm=None, ax=None):
     if ax is None:
         f, ax = plt.subplots(1)
     else:
         f = ax.figure
     ax.axis('equal')
-    pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', vmin=vmin, vmax=vmax)
+    pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', norm=norm, cmap=cmap)
     f.colorbar(pcm, ax=ax)
     return f, ax, pcm
 
@@ -187,13 +215,13 @@ def sub(field: pd.DataFrame, background: pd.DataFrame):
     #         bg_matched = interpolate(field, background)
     # except ValueError:
     field = field.copy()
-    bg_matched = interpolate(field, background)
+    bg_matched = interpolate_dataframes(field, background)
     field.loc[:, ['mag_x', 'mag_y', 'mag_z']] = field.loc[:, ['mag_x', 'mag_y', 'mag_z']] - \
                                                 bg_matched.loc[:, ['mag_x', 'mag_y', 'mag_z']]
     return field
 
 
-def interpolate(df_coords, df_values):
+def interpolate_dataframes(df_coords, df_values):
     """
     Interpolates values in df_values onto coordinates in df_coords.
     :param df_coords: Onto which positions to evaluate.
@@ -215,7 +243,7 @@ def div(dividend, divisor):
     :return:
     """
     dividend = dividend.copy()
-    divisor_matched = interpolate(dividend, divisor)
+    divisor_matched = interpolate_dataframes(dividend, divisor)
     dividend.loc[:, ['mag_x', 'mag_y', 'mag_z']] = dividend.loc[:, ['mag_x', 'mag_y', 'mag_z']] / \
                                                 divisor_matched.loc[:, ['mag_x', 'mag_y', 'mag_z']]
     return dividend

@@ -1,3 +1,4 @@
 MOCK = False
 log_mock = False
-CH3600 = True
+CH3600 = False
+cmap = 'inferno'
