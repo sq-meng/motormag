@@ -291,6 +291,3 @@ def backward(distance, speed=20):
 
 
 motor_port = SerialPortLibrary.SPLibClass()
-              
-# if __name__ == "__main__":
-#     init('COM8')

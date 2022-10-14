@@ -16,10 +16,6 @@ from . import _mode
 DEV = False
 
 
-# _s_gauss = serial.Serial(PORT_GAUSS, 115200, timeout=1)
-# _s_gauss.write(b'DATA?>')
-
-
 def parse_ch3600_serial(string):
     # pattern = '#([-+]?\d*\.{0,1}\d+)/([-+]?\d*\.{0,1}\d+)/([-+]?\d*\.{0,1}\d+)\>' for CH330
     pattern = r'#([-+]?\d*\.?\d+)/.*?([-+]?\d+);([-+]?\d*\.?\d+)/.*?([-+]?\d+);([-+]?\d*\.?\d+)/.*?([-+]?\d+)>'
