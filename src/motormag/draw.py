@@ -103,7 +103,7 @@ def _slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position
     :param cut_position: numerical position of index is not given.
     :return:
     """
-    cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
+    cut_index, cut_position = determine_cut_index(coordinates, cut_axis, cut_index, cut_position)
     draw_plane = [ax for ax in 'xyz' if ax != cut_axis]
     slicer = tuple([slice(None) if ax != cut_axis else cut_index for ax in 'xyz'])
     horizontal_matrix = coordinates[draw_plane[0]][slicer]
@@ -112,11 +112,31 @@ def _slice_2d_scalar(coordinates, values, cut_axis, cut_index=None, cut_position
     return horizontal_matrix, vertical_matrix, values_matrix
 
 
-def slice_1d_scalar(positions, values, axis, indices=None, position=None):
-    pass
+def slice_1d_scalar(coordinates, values, axis, indices=None, position=None):
+    fixed_axes = list('xyz')
+    fixed_axes.remove(axis)
+    ci, cp = determine_cut_indices(coordinates, axis, indices, position)
+    slicer = tuple([slice(None) if ax not in fixed_axes else ci[fixed_axes.index(ax)] for ax in 'xyz'])
+    x = coordinates[axis][slicer]
+    values = values[slicer]
+    return x, values
 
 
-def determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position):
+def determine_cut_indices(coordinates, cut_axis, indices, position):
+    fixed_axes = list('xyz')
+    fixed_axes.remove(cut_axis)
+    if indices is None:
+        indices = [None, None]
+    if position is None:
+        position = [None, None]
+    ci1, cp1 = determine_cut_index(coordinates, fixed_axes[0], indices[0], position[0])
+    ci2, cp2 = determine_cut_index(coordinates, fixed_axes[1], indices[1], position[1])
+    ci = [ci1, ci2]
+    cp = [cp1, cp2]
+    return ci, cp
+
+
+def determine_cut_index(coordinates, cut_axis, cut_index, cut_position):
     positions_slicer = tuple([slice(0, 1, 1) if ax != cut_axis else slice(None) for ax in 'xyz'])
     values = coordinates[cut_axis][positions_slicer].flatten()
     if cut_index is not None:
@@ -131,6 +151,18 @@ def determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position):
         raise ValueError("Requested cut plane position not in scanned data")
 
 
+def determine_1d_cut_axis(data_frame):
+    fixed_axes = determine_fixed_axes(data_frame)
+    if len(fixed_axes) == 2:
+        cut_axis = list('xyz')
+        cut_axis.remove(fixed_axes[0])
+        return cut_axis
+    elif len(fixed_axes) < 2:
+        raise ValueError('Failed to resolve cut axis automatically: more than 1 axes have changed.')
+    else:
+        raise ValueError('Somehow got 3 or more fixed axes...')
+
+
 def determine_2d_cut_axis(data_frame):
     fixed_axes = determine_fixed_axes(data_frame)
     if len(fixed_axes) == 1:
@@ -143,17 +175,58 @@ def determine_2d_cut_axis(data_frame):
         raise ValueError('Somehow got 3 or more fixed axes...')
 
 
+def plot_strength_1d(data_frame, cut_axis=None, cut_indices=None, cut_position=None, field_axis='xyz',
+                     ax=None):
+    if cut_axis is None:
+        cut_axis = determine_1d_cut_axis(data_frame)
+    coordinates, values = calculate_mag_field_amplitude(data_frame, axes=field_axis)
+    ci, cp = determine_cut_indices(coordinates, cut_axis, cut_indices, cut_position)
+    x, y = slice_1d_scalar(coordinates, values, cut_axis, cut_indices)
+    f = None
+    if ax is None:
+        f, ax = plt.subplots(1)
+    curve = ax.scatter(x, y)
+    ax.set_ylabel('Field strength/mT')
+    ax.set_xlabel('%s Position/mm' % cut_axis)
+    fixed_axes = list('xyz')
+    fixed_axes.remove(cut_axis)
+    ax.set_title('Linear cut: %s=%.2f mm, %s=%.2f mm' % (fixed_axes[0], cp[0], fixed_axes[1], cp[1]))
+    return f, ax, curve
+
+
+def plot_relative_gradient_1d(data_frame, cut_axis=None, cut_indices=None, cut_position=None, field_axes='xy',
+                              spatial_axes='xyz', b_zero=None, center_position=None, ax=None):
+    if cut_axis is None:
+        cut_axis = determine_1d_cut_axis(data_frame)
+    coordinates, _ = dataframe_to_matrices(data_frame)
+    values = np.sqrt(relative_field_gradient_squared(data_frame, field_axes, directions=spatial_axes,
+                                                     b_zero=b_zero, center_position=center_position))
+    ci, cp = determine_cut_indices(coordinates, cut_axis, cut_indices, cut_position)
+    x, y = slice_1d_scalar(coordinates, values, cut_axis, cut_indices)
+    f = None
+    if ax is None:
+        f, ax = plt.subplots(1)
+    curve = ax.scatter(x, y)
+    ax.set_ylabel('Relative field gradient/(1/mm)')
+    ax.set_xlabel('%s Position/mm' % cut_axis)
+    fixed_axes = list('xyz')
+    fixed_axes.remove(cut_axis)
+    ax.set_title('Linear cut: %s=%.2f mm, %s=%.2f mm' % (fixed_axes[0], cp[0], fixed_axes[1], cp[1]))
+    ax.set_yscale('log')
+    return f, ax, curve
+
+
 def plot_strength_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axis='xyz',
-                     vmin=None, vmax=None, norm=None, ax=None):
+                     vmin=None, vmax=None, norm=None, ax=None, cbar=True):
     if cut_axis is None:
         cut_axis = determine_2d_cut_axis(data_frame)
     cut_plane = [axis for axis in 'xyz' if axis != cut_axis]
     coordinates, values = calculate_mag_field_amplitude(data_frame, axes=field_axis)
     horizontal_matrix, vertical_matrix, values_matrix = _slice_2d_scalar(coordinates, values, cut_axis, cut_index, cut_position)
-    cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
+    cut_index, cut_position = determine_cut_index(coordinates, cut_axis, cut_index, cut_position)
     if norm is None:
         norm = Normalize(vmin=vmin, vmax=vmax)
-    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, norm, ax)
+    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, norm, ax, cbar)
     ax.set_title('Field: %s, cut position: %s=%.1f(i=%d) in mT' % (field_axis, cut_axis, cut_position, cut_index))
     ax.set_xlabel('%s/mm' % cut_plane[0])
     ax.set_ylabel('%s/mm' % cut_plane[1])
@@ -162,7 +235,7 @@ def plot_strength_2d(data_frame, cut_axis=None, cut_index=None, cut_position=Non
 
 def plot_relative_gradient_2d(data_frame, cut_axis=None, cut_index=None, cut_position=None, field_axes='xy',
                               spatial_axes='xyz', b_zero=None, center_position=None, vmin=1e-5, vmax=1e-1, norm=None,
-                              ax=None):
+                              ax=None, cbar=True):
     if cut_axis is None:
         cut_axis = determine_2d_cut_axis(data_frame)
     coordinates, _ = dataframe_to_matrices(data_frame)
@@ -170,10 +243,10 @@ def plot_relative_gradient_2d(data_frame, cut_axis=None, cut_index=None, cut_pos
                                                      b_zero=b_zero, center_position=center_position))
     horizontal_matrix, vertical_matrix, values_matrix = _slice_2d_scalar(coordinates, values, cut_axis, cut_index,
                                                                          cut_position)
-    cut_index, cut_position = determine_2d_cut_index(coordinates, cut_axis, cut_index, cut_position)
+    cut_index, cut_position = determine_cut_index(coordinates, cut_axis, cut_index, cut_position)
     if norm is None:
         norm = LogNorm(vmin=vmin, vmax=vmax)
-    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin, vmax, norm, ax)
+    f, ax, pcm = plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, norm, ax, cbar)
     contour_plot = ax.contour(horizontal_matrix, vertical_matrix, values_matrix, [2e-5, 5e-5, 1e-4, 2e-4, 0.0005],
                               colors='w', zorder=10)
     ax.clabel(contour_plot, fontsize=10, inline=1, fmt='%.0e')
@@ -189,14 +262,15 @@ def determine_fixed_axes(data_frame):
     return [ax for (ax, t) in zip('xyz', fixed) if t]
 
 
-def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, vmin=None, vmax=None, norm=None, ax=None):
+def plot_scalar_matrix(horizontal_matrix, vertical_matrix, values_matrix, norm=None, ax=None, cbar=True):
     if ax is None:
         f, ax = plt.subplots(1)
     else:
         f = ax.figure
     ax.axis('equal')
     pcm = ax.pcolormesh(horizontal_matrix, vertical_matrix, values_matrix, shading='auto', norm=norm, cmap=cmap)
-    f.colorbar(pcm, ax=ax)
+    if cbar:
+        f.colorbar(pcm, ax=ax)
     return f, ax, pcm
 
 
@@ -247,3 +321,11 @@ def div(dividend, divisor):
     dividend.loc[:, ['mag_x', 'mag_y', 'mag_z']] = dividend.loc[:, ['mag_x', 'mag_y', 'mag_z']] / \
                                                 divisor_matched.loc[:, ['mag_x', 'mag_y', 'mag_z']]
     return dividend
+
+
+def average_gradient(displacement, geometry, data, field_axes='xy', spatial_axes='xyz'):
+    coordinates, _ = dataframe_to_matrices(data)
+    v = relative_field_gradient_squared(data, field_axes, directions=spatial_axes, b_zero=1e-2).flatten()
+    x, y, z = coordinates['x'].flatten(), coordinates['y'].flatten(), coordinates['z'].flatten()
+    gradients = griddata(np.vstack([x, y, z]).T, v, geometry[['x', 'y', 'z']] + displacement)
+    return np.sum(gradients) / len(geometry)
